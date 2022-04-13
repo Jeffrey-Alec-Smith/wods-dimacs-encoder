@@ -30,12 +30,19 @@ public class Wordle {
         solutionSet = solutionSet.stream()
                 .filter(s -> !containsDuplicateCharacter(s))
                 .collect(Collectors.toList());
+        System.out.println(solutionSet.size());
+
+        solutionSet = removeAnagrams(solutionSet);
+
+        System.out.println("POST ANAGRAM FILTER: " + solutionSet.size());
 
         groupWords(solutionSet);
 
         for (List<Integer> group : letterGroupEncodings) {
             oneHotEncode(group, false);
         }
+
+
 
         // Each word implies its letters
         solutionSet
@@ -69,6 +76,29 @@ public class Wordle {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private List<String> removeAnagrams(List<String> words) {
+        var anagramless = new ArrayList<String>();
+        for (String word : words) {
+            var hasAnagram = false;
+            for (String other : anagramless) {
+                if (isAnagram(word, other)) {
+                    hasAnagram = true;
+                    System.out.println(word + " IS ANAGRAM OF " + other);
+                    break;
+                }
+            }
+            if (!hasAnagram) anagramless.add(word);
+        }
+        return anagramless;
+    }
+
+    private boolean isAnagram(String s1, String s2) {
+        for (var c : s1.toCharArray()) {
+            if (s2.indexOf(c) < 0) return false;
+        }
+        return true;
     }
 
     private void implyLetters(String word) {
@@ -118,15 +148,16 @@ public class Wordle {
                 .forEachOrdered((antecedent) -> literals.stream()
                         .filter((consquent) -> !consquent.equals(antecedent))
                         .forEachOrdered((consequent) -> {
-                            sb.append("\n")
-                                    .append(oneCold ? antecedent : -antecedent)
-                                    .append(" ")
-                                    .append(oneCold ? consequent : -consequent)
-                                    .append(" 0");
-                            literalsSet.add(Math.abs(antecedent));
-                            literalsSet.add(Math.abs(consequent));
-                            clauses.getAndIncrement();
-
+                            if (antecedent < consequent) {
+                                sb.append("\n")
+                                        .append(oneCold ? antecedent : -antecedent)
+                                        .append(" ")
+                                        .append(oneCold ? consequent : -consequent)
+                                        .append(" 0");
+                                literalsSet.add(Math.abs(antecedent));
+                                literalsSet.add(Math.abs(consequent));
+                                clauses.getAndIncrement();
+                            }
                         }));
     }
 
