@@ -21,16 +21,15 @@ public class WordEncoder {
 
     public static String convertIntToBinaryString(int value, char separator, int interval, int offset) {
         var sb = new StringBuilder();
-        var counter = 0;
+        var counter = -offset;
         var indexer = 1 << 31;
         for (int i = 0; i < 32; i++) {
             // Append separator if the interval has been reached and the interval won't be the first character
-            if (counter == interval && i > 0) {
+            if (counter >= interval && i > 0) {
                 sb.append(separator);
                 counter = 0;
             }
-            if (offset > 0) offset--;
-            else counter++;
+            counter++;
             var active = value & indexer;
             indexer = indexer >>> 1;
             sb.append(active > 0 ? 1 : 0);
