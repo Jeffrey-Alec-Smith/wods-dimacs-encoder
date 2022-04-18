@@ -14,42 +14,40 @@ public class Wordle {
     private static final String VALID_DICTIONARY_FILENAME = "valid.txt";
     private static final int LETTER_ORDINAL_OFFSET = 96;
     private static final String CHARACTER_SET = "abcdefghijklmnopqrstuvwxyz";
-    List<String> solutionSet; // Set of Words Wordle chooses from for possible solutions
-    List<String> validSet; // Set of Words for which Wordle will give a response
+    private List<String> solutionSet; // Set of Words Wordle chooses from for possible solutions
+    private List<String> validSet; // Set of Words for which Wordle will give a response
     //private PrintWriter pw;
     private final StringBuilder sb = new StringBuilder();
-    List<String>[] letterGroups;
-    List<Integer>[] letterGroupEncodings;
-    Set<Integer> literalsSet = new HashSet<>();
-    AtomicInteger clauses = new AtomicInteger();
+    private List<String>[] letterGroups;
+    private List<Integer>[] letterGroupEncodings;
+    private final Set<Integer> literalsSet = new HashSet<>();
+    private final AtomicInteger clauses = new AtomicInteger();
+    private final WordEncoder encoder;
 
     public Wordle(String outname) throws IOException {
         initializeSolutionSet();
         initializeValidSet();
 
-        solutionSet = solutionSet.stream()
+        solutionSet = validSet.stream()
                 .filter(s -> !containsDuplicateCharacter(s))
+                .sorted()
                 .collect(Collectors.toList());
-        System.out.println(solutionSet.size());
 
         solutionSet = removeAnagrams(solutionSet);
 
-        System.out.println("POST ANAGRAM FILTER: " + solutionSet.size());
-
+        encoder = new WordEncoder(solutionSet);
         groupWords(solutionSet);
 
+         // change if needed
         for (List<Integer> group : letterGroupEncodings) {
             oneHotEncode(group, false);
         }
-
-
 
         // Each word implies its letters
         solutionSet
                 .stream()
                 .sorted()
                 .forEachOrdered(this::implyLetters);
-
 
         // exactly 25 out of 26 letters are contained in the set <=> 1 out of 26 letters is NOT contained in the set
         var range = IntStream.rangeClosed(1, 26).boxed().collect(Collectors.toList());
@@ -65,12 +63,17 @@ public class Wordle {
             sb.append(" 0");
             clauses.getAndIncrement();
         }
+        // Add the header
+        sb.insert(0, "p cnf " + literalsSet.size() + " " + clauses.get());
+
+        encoder.writeMappingFile();
 
         System.out.println("Solution Set size: " + solutionSet.size());
         System.out.println("Number of literals used: " + literalsSet.size());
         System.out.println("Number of clauses used: " + clauses.get());
-        sb.insert(0, "p cnf " + literalsSet.size() + " " + clauses.get());
-        //System.out.println(sb.toString());
+        System.out.println("Max var value: " + literalsSet.stream().max(Integer::compareTo));
+
+
         try (var pw = new PrintWriter(new BufferedWriter(new FileWriter(outname)))) {
             pw.write(sb.toString());
         } catch (Exception e) {
@@ -102,7 +105,7 @@ public class Wordle {
     }
 
     private void implyLetters(String word) {
-        var encoding = new WordEncoder().encodeWord(word);
+        var encoding = encoder.encodeWord(word);
         //sb.append(word).append("\n");
         for (char c : word.toCharArray()) {
             var letterEncoding = c - LETTER_ORDINAL_OFFSET;
@@ -130,7 +133,6 @@ public class Wordle {
         // Convert to int encodings
         //System.out.println("WORD GROUP ENCODINGS");
         letterGroupEncodings = new List[CHARACTER_SET.length()];
-        var encoder = new WordEncoder();
         for (int i = 0; i < CHARACTER_SET.length(); i++) {
             var groupEncoding = new ArrayList<Integer>();
             var group = letterGroups[i];
@@ -146,9 +148,9 @@ public class Wordle {
     private void oneHotEncode(List<Integer> literals, boolean oneCold) {
         literals.stream()
                 .forEachOrdered((antecedent) -> literals.stream()
-                        .filter((consquent) -> !consquent.equals(antecedent))
+                        //.filter((consquent) -> !consquent.equals(antecedent))
                         .forEachOrdered((consequent) -> {
-                            if (antecedent < consequent) {
+                            if (consequent < antecedent) {
                                 sb.append("\n")
                                         .append(oneCold ? antecedent : -antecedent)
                                         .append(" ")
